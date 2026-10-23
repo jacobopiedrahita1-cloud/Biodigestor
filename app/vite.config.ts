@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     plugins: offline ? [viteSingleFile({ removeViteModuleLoader: true })] : [],
     build: {
       outDir: offline ? 'dist-offline' : 'dist',
+      emptyOutDir: true,
       assetsInlineLimit: offline ? 100_000_000 : 4096,
       chunkSizeWarningLimit: 1200,
     },

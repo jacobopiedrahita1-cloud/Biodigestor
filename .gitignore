@@ -1,4 +1,4 @@
 node_modules
-dist
-dist-offline
-qa
+app/node_modules
+app/dist
+app/dist-offline

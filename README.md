@@ -19,35 +19,32 @@ El archivo `entrega/BIO-DIGESTION-offline.html` trae todo dentro: código, 3D, t
 > Usa siempre el mismo navegador y el mismo archivo durante la feria, para que las opiniones se acumulen en un solo lugar.
 > Al final del día, en la sección **Opiniones**, pulsa **Exportar (.csv)** para guardarlas.
 
-## Ejecutar en modo desarrollo
+## Cómo está organizado el repositorio
+
+- **Raíz** (`index.html`, `assets/`): la página **ya compilada**, que es lo que publica GitHub Pages (modo "Deploy from a branch", rama `main`, carpeta `/`).
+- **`app/`**: el código fuente.
+- **`entrega/`**: la versión sin internet.
+
+Dirección pública: `https://jacobopiedrahita1-cloud.github.io/Biodigestor/`
+
+## Modificar y volver a publicar
 
 Requisitos: Node.js 20.19 o superior.
 
 ```bash
+cd app
 npm install
-npm run dev          # http://localhost:5173
+npm run dev        # vista de desarrollo en http://localhost:5173
+npm run publish    # compila y copia el resultado a la raíz y a entrega/
 ```
 
-## Compilar
-
-```bash
-npm run build          # dist/          → versión web (GitHub Pages)
-npm run build:offline  # dist-offline/  → un único index.html que abre sin internet
-npm run preview        # sirve dist/ en http://localhost:4173
-```
-
-## Publicar en GitHub Pages
-
-1. El código ya está en la raíz de este repositorio (`Biodigestor`), rama `main`.
-2. En GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. El flujo `.github/workflows/deploy.yml` compila y publica en cada `push` a `main`.
-4. La dirección será `https://jacobopiedrahita1-cloud.github.io/Biodigestor/`. Con ella puedes generar el código QR para el stand.
+Después haz commit y push a `main`: GitHub Pages se actualiza solo en uno o dos minutos.
 
 ## Estructura
 
 ```
-index.html               Contenido semántico de todas las secciones
-src/
+app/index.html           Contenido semántico de todas las secciones
+app/src/
   main.ts                Arranque: cada sección se inicia por separado
   data/experiment.ts     ÚNICA fuente de datos del experimento (del informe)
   data/game.ts           Residuos y preguntas del ECO RETO
