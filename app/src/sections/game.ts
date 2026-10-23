@@ -1,9 +1,13 @@
 import { BINS, QUIZ, WASTE, type Bin, type WasteItem } from '../data/game';
 import { el, shuffle } from '../lib/dom';
 import { sound } from '../lib/sound';
+import { NAME_MAX, addScore, cleanName, clearScores, formatTime, loadScores, type ScoreEntry } from '../lib/leaderboard';
 
 const SORT_POINTS = 10;
 const QUIZ_POINTS = 15;
+const SORT_COUNT = 5;
+const QUIZ_COUNT = 3;
+const NAME_KEY = 'biodigestion.player';
 
 /** ECO RETO: fase 1 clasificar residuos, fase 2 preguntas. */
 export function initGame(reducedMotion: boolean): void {
@@ -17,6 +21,9 @@ export function initGame(reducedMotion: boolean): void {
   let quizOk = 0;
   let phase: 'intro' | 'sort' | 'quiz' | 'end' = 'intro';
   let awaitingNext = false;
+  let player = '';
+  let startedAt = 0;
+  try { player = sessionStorage.getItem(NAME_KEY) ?? ''; } catch { /* ignorar */ }
 
   const scoreNode = el('b', {}, '0');
   const phaseNode = el('span', { class: 'game-phase' });
@@ -51,29 +58,50 @@ export function initGame(reducedMotion: boolean): void {
     phase = 'intro';
     phaseNode.textContent = '';
     setProgress(0);
-    const start = el('button', { class: 'btn btn-primary', type: 'button' }, 'Comenzar el reto →');
-    start.addEventListener('click', startGame);
+    const input = el('input', { type: 'text', id: 'player-name', class: 'name-input', maxlength: NAME_MAX, autocomplete: 'off', required: true, placeholder: 'Ej.: Valentina 11-B', value: player, 'aria-describedby': 'player-err' }) as HTMLInputElement;
+    const err = el('p', { class: 'field-error name-err', id: 'player-err', 'aria-live': 'polite' });
+    const form = el('form', { class: 'name-form', novalidate: true },
+      el('label', { for: 'player-name' }, 'Escribe tu nombre para la tabla de clasificación'),
+      el('div', { class: 'name-row' }, input, el('button', { class: 'btn btn-primary', type: 'submit' }, 'Iniciar reto →')),
+      err,
+    ) as HTMLFormElement;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = cleanName(input.value);
+      if (name.length < 2) {
+        err.textContent = 'Escribe un nombre de al menos 2 letras.';
+        input.setAttribute('aria-invalid', 'true');
+        input.focus();
+        return;
+      }
+      player = name;
+      try { sessionStorage.setItem(NAME_KEY, name); } catch { /* ignorar */ }
+      startGame();
+    });
+    input.addEventListener('input', () => { input.removeAttribute('aria-invalid'); err.textContent = ''; });
     body.replaceChildren(el('div', { class: 'game-intro' },
       el('h3', {}, '¿Listo para alimentar el biodigestor?'),
-      el('p', {}, 'Aparecerán 10 residuos. Decide si van al biodigestor, si solo sirven con moderación o si no van. Después responde 6 preguntas.'),
+      el('p', {}, `Aparecerán ${SORT_COUNT} residuos. Decide si van al biodigestor, si solo sirven con moderación o si no van. Después responde ${QUIZ_COUNT} preguntas rápidas.`),
       el('ul', { class: 'game-rules' },
         el('li', {}, el('b', {}, 'Arrastra'), 'la tarjeta hasta una caneca.'),
         el('li', {}, el('b', {}, 'O toca'), 'una caneca para enviar el residuo.'),
         el('li', {}, el('b', {}, 'Teclado:'), 'teclas 1, 2 y 3; Enter para continuar.'),
       ),
-      start,
+      form,
+      leaderboard(loadScores().slice(0, 5), null, 'Mejores puntajes'),
     ));
   }
 
   function startGame() {
     sound.play('tap');
     const by = (b: Bin) => shuffle(WASTE.filter((w) => w.bin === b));
-    items = shuffle([...by('si').slice(0, 4), ...by('moderacion').slice(0, 2), ...by('no').slice(0, 4)]);
-    quiz = shuffle(QUIZ).map((q) => {
+    items = shuffle([...by('si').slice(0, 2), ...by('moderacion').slice(0, 1), ...by('no').slice(0, 2)]);
+    quiz = shuffle(QUIZ).slice(0, QUIZ_COUNT).map((q) => {
       const order = shuffle(q.options.map((_, i) => i));
       return { ...q, options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer) };
     });
     index = 0; sortOk = 0; quizOk = 0;
+    startedAt = performance.now();
     setScore(0);
     phase = 'sort';
     renderSort();
@@ -235,24 +263,59 @@ export function initGame(reducedMotion: boolean): void {
     phaseNode.textContent = 'Resultado';
     setProgress(totalSteps());
     const max = items.length * SORT_POINTS + quiz.length * QUIZ_POINTS;
+    const ms = performance.now() - startedAt;
     const pct = score / max;
-    const title = pct >= 0.9 ? '¡Experto en biodigestión!' : pct >= 0.65 ? '¡Muy bien! Vas por buen camino.' : '¡Buen intento! Vuelve a jugar y mejora.';
+    const title = pct >= 0.9 ? `¡Experto en biodigestión, ${player}!` : pct >= 0.65 ? `¡Muy bien, ${player}!` : `¡Buen intento, ${player}!`;
     sound.play(pct >= 0.65 ? 'win' : 'tap');
+    const saved = addScore({ name: player, score, max, ms });
+    const list = saved?.list ?? loadScores();
+    const rank = saved ? list.findIndex((e) => e.id === saved.id) + 1 : 0;
+
     const again = el('button', { class: 'btn btn-primary', type: 'button' }, 'Jugar otra vez ↻');
     again.addEventListener('click', startGame);
+    const other = el('button', { class: 'btn btn-ghost', type: 'button' }, 'Nuevo jugador');
+    other.addEventListener('click', () => { player = ''; try { sessionStorage.removeItem(NAME_KEY); } catch { /* ignorar */ } renderIntro(); });
     const h = el('h3', { tabindex: -1 }, title);
     body.replaceChildren(el('div', { class: 'game-end' },
       h,
       el('p', { class: 'end-score', 'aria-label': `${score} de ${max} puntos` }, String(score)),
-      el('p', {}, `de ${max} puntos posibles`),
+      el('p', {}, `de ${max} puntos posibles · ${formatTime(ms)}`),
       el('ul', { class: 'end-stats' },
         el('li', {}, `Residuos bien clasificados: ${sortOk}/${items.length}`),
         el('li', {}, `Preguntas correctas: ${quizOk}/${quiz.length}`),
+        rank ? el('li', { class: 'end-rank' }, `Puesto #${rank} en la tabla`) : null,
       ),
-      again,
+      el('div', { class: 'end-actions' }, again, other),
+      leaderboard(list.slice(0, 10), saved?.id ?? null, 'Tabla de clasificación'),
     ));
-    live.textContent = `${title} ${score} de ${max} puntos.`;
+    live.textContent = `${title} ${score} de ${max} puntos.` + (rank ? ` Puesto ${rank} en la tabla.` : '');
     h.focus({ preventScroll: true });
+  }
+
+  function leaderboard(list: ScoreEntry[], highlight: string | null, heading: string): HTMLElement {
+    const wrap = el('div', { class: 'board' }, el('h4', { class: 'board-title' }, '🏆 ' + heading));
+    if (!list.length) {
+      wrap.append(el('p', { class: 'board-empty' }, 'Aún no hay puntajes en este dispositivo. ¡Sé el primero!'));
+      return wrap;
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    wrap.append(el('table', { class: 'board-table' },
+      el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, '#'), el('th', { scope: 'col' }, 'Jugador'), el('th', { scope: 'col' }, 'Puntos'), el('th', { scope: 'col' }, 'Tiempo'))),
+      el('tbody', {}, ...list.map((e, i) => el('tr', { class: e.id === highlight ? 'is-me' : undefined, 'aria-current': e.id === highlight ? 'true' : undefined },
+        el('td', {}, medals[i] ?? String(i + 1)),
+        el('td', {}, e.name),
+        el('td', {}, `${e.score}`, el('small', {}, ` / ${e.max}`)),
+        el('td', {}, formatTime(e.ms)),
+      ))),
+    ));
+    const clear = el('button', { class: 'board-clear', type: 'button' }, 'Borrar tabla');
+    clear.addEventListener('click', () => {
+      if (!confirm('¿Borrar todos los puntajes de este dispositivo?')) return;
+      clearScores();
+      wrap.replaceWith(leaderboard([], null, heading));
+    });
+    wrap.append(el('p', { class: 'board-note' }, 'Los puntajes se guardan solo en este dispositivo. ', clear));
+    return wrap;
   }
 
   // Atajos de teclado cuando el juego está a la vista y el foco no está en un campo de texto

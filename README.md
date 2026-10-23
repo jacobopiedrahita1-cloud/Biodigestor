@@ -64,6 +64,7 @@ app/src/
 - **Datos**: solo los del informe (40 días, día 9, 200 mL el día 14, 802 mL, 24,9 %, 25,1 y ≈20,1 mL/día). No hay curva diaria, porque no existe un registro diario y una curva obligaría a inventar valores.
 - **Turbina y generador**: se muestran como *propuesta conceptual*, con estética de holograma y la advertencia correspondiente.
 - **Opiniones**: se guardan únicamente en el navegador (localStorage), y la página lo dice. El texto se muestra siempre como texto plano, nunca como HTML. Incluye un campo trampa para bots, una espera de 20 s entre envíos, un modo de moderación local y exportación a CSV.
+- **ECO RETO**: el jugador escribe su nombre, clasifica 5 residuos y responde 3 preguntas. Al final aparece la tabla de clasificación (más puntos primero; si empatan, gana el más rápido), guardada solo en ese dispositivo.
 - **3D**: todo es procedural, sin modelos descargados. En celulares y equipos modestos se reduce la calidad automáticamente. Sin WebGL se muestra una ilustración SVG. Con `prefers-reduced-motion` la escena queda estática.
 - Para probar la ilustración sin 3D, agrega `?no3d` a la URL.
 
